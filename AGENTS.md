@@ -53,3 +53,10 @@ examples/ plugins, themes
 - Work in this loop: plan -> implement -> test -> self-review against acceptance criteria -> fix -> report.
 - Never weaken a test to make it pass. Never skip a failing test without documenting why in the report.
 - Prefer boring, well-maintained dependencies; justify each new dependency in the package README.
+
+## Container runtime (local environment)
+- This machine uses Kiri (Docker-compatible runtime on WSL2), NOT Docker Desktop. Do not install or require Docker Desktop.
+- Docker CLI context is `kiri`; the engine is reachable at `npipe:////./pipe/kiri`. Testcontainers must use this endpoint (DOCKER_HOST or ~/.testcontainers.properties).
+- Never hard-code a Docker socket path in project code or tests; read DOCKER_HOST so the project works with Docker Desktop, Kiri, Podman or CI.
+- If the container engine is unreachable, stop and report the exact error in the phase report. Do not work around it by mocking databases or skipping integration tests.
+- Image pulls must not rely on registries that are no longer public; prefer official images.
