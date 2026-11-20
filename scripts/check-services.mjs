@@ -27,7 +27,7 @@ for (const [service, containerPort, path] of [
   ["mailpit", "8025", "/readyz"],
   ["minio", "9000", "/minio/health/ready"],
 ]) {
-  const address = compose("port", service, containerPort);
+  const address = compose("port", service, String(containerPort));
   const response = await fetch(`http://${address}${path}`, { signal: AbortSignal.timeout(5_000) });
   assert.ok(response.ok, `${service} returned ${response.status}`);
 }

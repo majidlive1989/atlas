@@ -36,7 +36,7 @@ jobs:
         with:
           node-version-file: .node-version
       - run: docker compose --env-file .env.example config --quiet
-      - run: docker compose up --wait --wait-timeout 120
+      - run: docker compose up --build --wait --wait-timeout 120
       - run: node scripts/check-services.mjs
       - if: failure()
         run: docker compose logs

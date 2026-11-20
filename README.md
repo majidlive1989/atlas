@@ -19,7 +19,7 @@ pnpm test:integration
 pnpm services:down
 ```
 
-Compose runs on loopback with local development credentials. Copy `.env.example` to `.env` to override ports or credentials. Named volumes survive `pnpm services:down`. The Mailpit UI defaults to port 8025 and the MinIO console to port 9001. `pnpm dev` runs the three app compile watchers.
+Compose runs on loopback with local development credentials. Copy `.env.example` to `.env` to override ports or credentials. Named volumes survive `pnpm services:down`. The Mailpit UI defaults to port 8025 and the MinIO console to port 9001. The first Compose startup builds the MinIO image from a checksum-pinned release binary for Linux amd64 or arm64. `pnpm dev` runs the three app compile watchers.
 
 ## Workspace tooling
 
