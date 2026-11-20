@@ -1,0 +1,8 @@
+{
+  "extends": "./packages/tsconfig/index.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["docs/contracts/*.ts", "playwright.config.ts", "tests/e2e/*.ts"]
+}

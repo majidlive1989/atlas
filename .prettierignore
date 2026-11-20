@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+.phase0-runtime/
+.pnpm-store/
+AGENTS.md
+START-HERE.md
+docs/prompts/
