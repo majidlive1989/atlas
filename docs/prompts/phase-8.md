@@ -1,0 +1,23 @@
+Read AGENTS.md, prior reports, the "WP plugin migration contract" in docs/contracts. Implement PHASE 8.
+
+IMPORTANT: PHP is NOT executed inside Atlas, and Atlas is NOT a WordPress clone. The Atlas plugin SDK is always the primary, native target. This phase delivers a PORTING CONTRACT (a documented, machine-readable mapping from WordPress concepts to Atlas-native concepts) plus tooling that analyzes a WP plugin's LOGIC and scaffolds an Atlas-native port. Ported plugins should read like native Atlas plugins, not like WordPress code in TypeScript. Be explicit and honest about limits.
+
+SCOPE
+1. `@atlas/wp-compat`: a SMALL optional adapter package (limit to roughly the 30 to 40 most common concepts), used only as a fallback by generated ports where a native equivalent would obscure intent. It must never bypass the core and is built only on the public plugin SDK. It is NOT a reimplementation of WordPress. Its typed signatures cover only: `addAction/doAction/removeAction`, `addFilter/applyFilters`, `registerPostType`, `registerTaxonomy`, `registerPostMeta/registerMeta`, `addMetaBox` (maps to custom-field groups + admin UI), `getOption/updateOption/deleteOption`, transients, `addShortcode/doShortcode`, `registerRestRoute`, `currentUserCan/addRole/addCap`, `wpEnqueueScript/Style` equivalents for admin/theme assets, `addMenuPage/addSubmenuPage` (maps to admin menu declarations), settings API (`registerSetting`, sections/fields) mapped to settings schema, `wpSchedule*` cron mapping, nonce-equivalent helpers, `wpdb`-style safe query helper scoped to the plugin namespace (parameterized only), `WP_Query`-style query builder over the content API, `wp_mail` wrapper, `wp_remote_get/post` wrapper using the SSRF-safe HTTP client, i18n helpers (`__`, `_x`, `_n`, `esc_html__` equivalents) backed by ICU catalogs, `is_admin`-style context helpers.
+   WooCommerce layer `@atlas/woo-compat`: product/order/cart/coupon accessor wrappers and the most-used Woo hooks mapped to Atlas commerce hooks/events, with a documented mapping table.
+2. Porting Contract document (docs/guides/wp-porting-contract.md): machine-readable mapping file (`mappings/wp-to-atlas.json`) + human guide: every supported WP function/hook -> Atlas API, behavior differences, unsupported areas (e.g., direct filesystem tricks, global `$wp_*` mutation, PHP-serialized data, eval/dynamic includes, admin-ajax patterns -> REST) with recommended alternatives.
+3. CLI `atlas port-wp <path|zip>`:
+   - Parse PHP with a robust parser (php-parser/tree-sitter-php), build an inventory: plugin header metadata, hooks used (add_action/add_filter, names + priorities), CPT/taxonomies/meta/options, shortcodes, REST routes, admin menu pages, cron events, DB tables (dbDelta/CREATE TABLE), enqueued assets, AJAX handlers, i18n text domain, Woo usage, unsupported constructs.
+   - Analyze the plugin's behavior (what it does, not how WP wires it) and generate an Atlas-native plugin: `plugin.json`, typed TS code per detected feature using the NATIVE Atlas SDK (wp-compat only as a documented fallback), SQL migrations derived from CREATE TABLE (type-mapped, namespaced), settings schema from the Settings API usage, i18n catalogs converted from .pot/.po, admin page skeletons, asset copy plan.
+   - Emit `PORT_REPORT.md` + JSON: counts, % auto-translated, a prioritized manual TODO list with file/line references, risk flags (security-sensitive code, raw SQL, file operations).
+   - `--dry-run`, `--out`, `--strict`, and snapshot tests.
+4. Data migration helper: `atlas wp-import` extending the Phase 3 WXR importer with options/postmeta/usermeta unserialization (safe PHP-unserialize implementation, no object instantiation) and plugin-table import mappings.
+5. Worked examples in examples/wp-ports: port three representative open-source-style WP plugins written by you as fixtures (a simple shortcode plugin, a CPT + meta box + REST plugin, a WooCommerce extension adding a payment-fee + order meta). Each port is completed to a working, tested Atlas plugin and the report numbers are documented.
+6. Optional design doc only (no implementation): out-of-process PHP bridge (e.g., php-fpm sidecar behind a capability-restricted RPC) with security/perf trade-offs and a decision recommendation.
+
+TESTS
+Snapshot tests of generated output; round-trip tests (ported fixture plugins pass behavior tests written against expected WP behavior); fuzz tests for the PHP unserializer; security test confirming no PHP execution or object instantiation.
+
+ACCEPTANCE
+- `atlas port-wp` on each fixture produces a building, passing Atlas plugin with a truthful compatibility report.
+- Mapping file covers every function exported by wp-compat (CI check). Definition of Done met. Report: docs/reports/phase-8.md
