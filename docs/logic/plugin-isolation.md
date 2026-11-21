@@ -1,0 +1,7 @@
+# Untrusted extension execution
+
+An approved untrusted release follows the existing install/activate/upgrade state machine. Only its validated release bytes reach a separate Linux container. A worker thread runs the entry inside that boundary and communicates through bounded, JSON-compatible RPC. Do not give the container host mounts, credentials, network access, privileged capabilities or a writable root. Bound memory, CPU, process count, message sizes and waits. Verify that the runtime can enforce those limits. Tear down on failed startup, replacement, shutdown or deadline and fail closed if the runner is unavailable.
+
+The host dispatches only named SDK operations. It derives site, plugin, version and grants from the activation rather than the message. Registration and execution use separate lifecycle windows. Test denies an undeclared scoped request and checks that the boundary keeps host resources unavailable. Use bundled ESM or dependency-free files for this tier. APIs containing executable schemas or closures must stay inside the worker and cross the boundary only through explicit descriptors or callback IDs. Support only operations with a validated host representation.
+
+WordPress extension callbacks typically execute in the same runtime as the application. Atlas keeps trusted extensions available for that model and adds an OS boundary for untrusted code under [ADR 0003](../adr/0003-plugin-isolation.md).

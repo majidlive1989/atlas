@@ -1,0 +1,9 @@
+# Plugin authoring, verification and distribution
+
+WP-CLI scaffolds plugin source, tests and packaging workflows, and installs extensions from releases. Atlas scaffolds into a new directory and rejects collisions. Interactive prompts use the same validation as flags. Output builds as TypeScript ESM, includes a tested server entry and locale catalog, and can opt into admin and frontend entries. Test authors use the public SDK through a mock lifecycle harness, HTTP route client, hook/event probes and an ephemeral PostgreSQL fixture.
+
+A pack operation reads regular files rooted in the release, validates the same manifest and file rules used by discovery, and orders the entries. Package checksums cover the complete archive. An optional Ed25519 signature covers the same archive and is verified using an operator-supplied public key. Verification fails for a missing or invalid requested signature, inconsistent checksums, unsafe member paths and invalid manifests. A registry index describes immutable release coordinates, digests and URLs. Distribution and marketplace publication remain separate from packaging. Verify deterministic output, mismatches, malformed archives and a generated project build.
+
+The contact-form example declares a private submission type, validates writes, applies a fail-closed spam filter, persists accepted submissions and delivers localized mail. An invalid or rejected submission produces neither side effect. A mail failure after persistence keeps the submission available for handling. Related posts registers a typed ranking filter, preserves input order among equal scores and exposes a schema-backed limit. Test both examples through the harness and the installed API.
+
+Behavior references include [WP-CLI scaffolding](https://developer.wordpress.org/cli/commands/scaffold/) and [WP-CLI installation](https://developer.wordpress.org/cli/commands/plugin/install/).

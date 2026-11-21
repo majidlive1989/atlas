@@ -37,3 +37,10 @@ Store JSONB envelopes with version, correlation ID and delivery timestamps; rese
 ## Test scenarios
 
 Validate outbox records commit with state; assert a failed transaction leaves no event.
+
+Phase 2 exposes owner-scoped BullMQ enqueue and cron registration. One-time job requests are stored
+in the PostgreSQL outbox. The relay uses deterministic job identifiers and marks facts dispatched
+after Redis accepts them. The scheduler claims due rows, dispatches at most one missed occurrence
+per check, and advances using the declared IANA time zone. Workers record completion claims in
+PostgreSQL. Handlers that perform external side effects must use their own idempotency key because
+an interrupted transaction can be retried. Jobs tied to an inactive release wait in the outbox.
