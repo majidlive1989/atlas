@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "releases": {
+      "maxItems": 10000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "schemaVersion": {
+                "type": "number",
+                "const": 1
+              },
+              "slug": {
+                "type": "string",
+                "maxLength": 32,
+                "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              },
+              "version": {
+                "type": "string",
+                "maxLength": 64
+              },
+              "engines": {
+                "type": "object",
+                "properties": {
+                  "atlas": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "atlas"
+                ],
+                "additionalProperties": false
+              },
+              "tier": {
+                "type": "string",
+                "enum": [
+                  "trusted",
+                  "untrusted"
+                ]
+              },
+              "entries": {
+                "type": "object",
+                "properties": {
+                  "server": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "admin": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "frontend": {
+                    "type": "string",
+                    "maxLength": 240
+                  }
+                },
+                "required": [
+                  "server"
+                ],
+                "additionalProperties": false
+              },
+              "requires": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "permissions": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "database"
+                        },
+                        "scope": {
+                          "type": "string",
+                          "const": "own-tables"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "scope"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "hooks"
+                        },
+                        "names": {
+                          "maxItems": 64,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 128
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "names"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "http"
+                        },
+                        "origins": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "origins"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "mail"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "cache"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "jobs"
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "storage"
+                        },
+                        "prefixes": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 240
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "prefixes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "migrations": {
+                "type": "string",
+                "maxLength": 240
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "slug",
+              "version",
+              "engines",
+              "tier",
+              "entries",
+              "permissions"
+            ],
+            "additionalProperties": false
+          },
+          "artifact": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "signature": {
+            "type": "string",
+            "format": "base64",
+            "contentEncoding": "base64",
+            "pattern": "^$|^(?:[0-9a-zA-Z+/]{4})*(?:(?:[0-9a-zA-Z+/]{2}==)|(?:[0-9a-zA-Z+/]{3}=))?$"
+          },
+          "signingKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "manifest",
+          "artifact",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "releases"
+  ],
+  "additionalProperties": false
+}

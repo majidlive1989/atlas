@@ -24,7 +24,20 @@ const serverPath = packagePath.refine((value) => /\.(?:mjs|js)$/.test(value));
 const permission = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("database"), scope: z.literal("own-tables") }),
   z.strictObject({ kind: z.literal("hooks"), names: z.array(z.string().min(3).max(128)).max(64) }),
-  z.strictObject({ kind: z.literal("http"), origins: z.array(z.url()).max(32) }),
+  z.strictObject({
+    kind: z.literal("http"),
+    origins: z
+      .array(
+        z.url().refine((value) => {
+          const url = new URL(value);
+          return url.protocol === "https:" && url.origin === value;
+        }),
+      )
+      .max(32),
+  }),
+  z.strictObject({ kind: z.literal("mail") }),
+  z.strictObject({ kind: z.literal("cache") }),
+  z.strictObject({ kind: z.literal("jobs") }),
   z.strictObject({ kind: z.literal("storage"), prefixes: z.array(packagePath).max(32) }),
 ]);
 
@@ -35,7 +48,11 @@ export const pluginManifest = z
     version: releaseVersion,
     engines: z.strictObject({ atlas: range }),
     tier: z.enum(["trusted", "untrusted"]),
-    entries: z.strictObject({ server: serverPath, admin: serverPath.optional() }),
+    entries: z.strictObject({
+      server: serverPath,
+      admin: serverPath.optional(),
+      frontend: serverPath.optional(),
+    }),
     requires: z.record(pluginSlug, range).optional(),
     permissions: z.array(permission).max(16),
     migrations: packagePath.optional(),

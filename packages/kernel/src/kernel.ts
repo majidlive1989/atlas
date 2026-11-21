@@ -12,6 +12,8 @@ import { createEventBus, createHooks, type CoreEventCatalog } from "@atlas/hooks
 import { trace, SpanStatusCode, type Span } from "@opentelemetry/api";
 import { pino } from "pino";
 import { createPluginManager } from "./plugins.js";
+import { createPluginResources } from "./plugin-resources.js";
+import type { PluginMail } from "@atlas/plugin-sdk";
 import { createSettings } from "./settings.js";
 
 type State = "created" | "booting" | "ready" | "draining" | "closed" | "failed";
@@ -23,6 +25,7 @@ type CoreActions = {
 export interface KernelDependencies {
   readonly database?: Database;
   readonly mail?: AuthOptions["mail"];
+  readonly pluginMail?: (message: PluginMail) => Promise<void>;
   readonly clock?: () => Date;
 }
 
@@ -70,9 +73,22 @@ export function createKernel(config: AtlasConfig, dependencies: KernelDependenci
     ...(dependencies.clock ? { clock: dependencies.clock } : {}),
     ...(oidc ? { oidc } : {}),
   });
+  const resources = createPluginResources({
+    storageRoot: resolve(config.ATLAS_PLUGIN_STORAGE),
+    database,
+    cacheUrl: config.ATLAS_PLUGIN_CACHE_URL,
+    redisUrl: config.ATLAS_PLUGIN_QUEUE_URL,
+    mailUrl: config.ATLAS_MAIL_URL,
+    mailFrom: config.ATLAS_MAIL_FROM,
+    mail: dependencies.pluginMail,
+    fault: () => logger.warn("Plugin queue error"),
+  });
   const plugins = createPluginManager({
     root: resolve(config.ATLAS_PLUGIN_ROOT),
     trusted: config.ATLAS_TRUSTED_PLUGINS,
+    grants: config.ATLAS_PLUGIN_RELEASE_GRANTS,
+    sandboxImage: config.ATLAS_PLUGIN_SANDBOX_IMAGE,
+    resources,
     database,
     events,
     fault: (slug, action) => logger.warn({ slug, action }, "Plugin lifecycle failed"),
@@ -123,6 +139,7 @@ export function createKernel(config: AtlasConfig, dependencies: KernelDependenci
         try {
           await checkMigrations(database);
           await plugins.restore();
+          resources.start();
           await hooks.actions.run("system.ready", { startedAt });
           if (state === "booting") state = "ready";
         } catch (error) {
@@ -151,6 +168,7 @@ export function createKernel(config: AtlasConfig, dependencies: KernelDependenci
         try {
           await start?.catch(() => undefined);
           await hooks.actions.run("system.beforeShutdown", { startedAt });
+          await resources.close();
           await plugins.shutdown();
         } finally {
           try {

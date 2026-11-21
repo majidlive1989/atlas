@@ -1,0 +1,10 @@
+[
+  {
+    "action": "create-table",
+    "table": "submissions",
+    "columns": [
+      { "name": "email", "type": "text" },
+      { "name": "message", "type": "text" }
+    ]
+  }
+]

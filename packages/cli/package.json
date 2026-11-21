@@ -25,7 +25,9 @@
     "@atlas/config": "workspace:*",
     "@atlas/db": "workspace:*",
     "@atlas/auth": "workspace:*",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "@atlas/plugin-sdk": "workspace:*",
+    "fflate": "^0.8.2"
   },
   "bin": {
     "atlas": "./dist/main.js"

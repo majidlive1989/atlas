@@ -70,7 +70,13 @@ export async function loadCapabilities(
 }
 
 export function verifyDelegation(principal: Principal, capabilities: readonly string[]): void {
-  if (capabilities.some((key) => !Object.hasOwn(coreCapabilities, key)))
+  if (
+    capabilities.some(
+      (key) =>
+        !Object.hasOwn(coreCapabilities, key) &&
+        !(key.startsWith("plugin.") && principal.capabilities.has(key)),
+    )
+  )
     throw new AuthError("not-found");
   if (capabilities.some((key) => !principal.capabilities.has(key)))
     throw new AuthError("forbidden");
@@ -87,6 +93,15 @@ type RoleRow = {
 export function createAccessService(database: Database) {
   return {
     capabilities: () => Object.entries(coreCapabilities).map(([key, label]) => ({ key, label })),
+    async pluginCapabilities(siteId: string) {
+      const extensions = await database.scoped(siteId, (tx) =>
+        tx.query<{ key: string; label: string }>(sql`
+        select distinct c.key, c.label from capabilities c
+        join role_capabilities r on r.capability_key = c.key and r.site_id = ${siteId}
+        where c.key like 'plugin.%' order by c.key`),
+      );
+      return extensions;
+    },
     roles(context: AuditContext) {
       return database.scoped(context.site.id, (tx) =>
         tx.query<RoleRow>(sql`

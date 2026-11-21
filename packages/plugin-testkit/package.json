@@ -18,5 +18,12 @@
   },
   "devDependencies": {
     "@atlas/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "@atlas/plugin-sdk": "workspace:*",
+    "@atlas/hooks": "workspace:*",
+    "@atlas/db": "workspace:*",
+    "@testcontainers/postgresql": "^11.11.0",
+    "zod": "^4.3.6"
   }
 }

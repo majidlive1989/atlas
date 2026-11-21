@@ -26,6 +26,7 @@ import {
 } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { registerAuth } from "./auth-routes.js";
+import { pluginOpenApi, registerPluginRoutes } from "./plugin-routes.js";
 import { registerManagement } from "./management-routes.js";
 
 const statusSchema = z.strictObject({ status: z.enum(["live", "ready"]) });
@@ -220,9 +221,16 @@ export async function createApi(kernel: Kernel): Promise<AtlasApi> {
       return { status: "ready" as const };
     },
   );
-  app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
+  app.get("/openapi.json", { schema: { hide: true } }, async (request) => {
+    const document = app.swagger();
+    const site = await resolveSite(services.database, request.host);
+    return site && "openapi" in document
+      ? { ...document, paths: { ...document.paths, ...pluginOpenApi(kernel, site.id) } }
+      : document;
+  });
   registerAuth(app, kernel, security);
   registerManagement(app, kernel, security);
+  registerPluginRoutes(app, kernel, security);
   app.addHook("onClose", async () => kernel.shutdown());
   return app;
 }

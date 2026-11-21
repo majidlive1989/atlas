@@ -4,3 +4,8 @@ pnpm-lock.yaml
 AGENTS.md
 START-HERE.md
 docs/prompts/
+
+# Keep the API Extractor report in its generated formatting.
+packages/plugin-sdk/etc/*.api.md
+docs/guides/hooks-reference.md
+docs/contracts/plugin-registry.schema.json

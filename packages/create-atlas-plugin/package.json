@@ -18,5 +18,11 @@
   },
   "devDependencies": {
     "@atlas/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "@atlas/plugin-sdk": "workspace:*"
+  },
+  "bin": {
+    "create-atlas-plugin": "./dist/main.js"
   }
 }

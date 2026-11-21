@@ -1,7 +1,13 @@
-# @atlas/example-plugins-contact-form
+# Contact form
 
-Contact form SDK walkthrough.
+Build the workspace and point `ATLAS_PLUGIN_ROOT` to `examples/plugins`. Add `contact-form`
+to the trusted slug list. Install version 1.0.0 and activate it through the operator CLI.
 
-The public surface is `src/index.ts`. Build with `pnpm build` and run its smoke test with
-`pnpm test` from this directory. Runtime dependencies are introduced with the phase that uses them.
-The shared TypeScript configuration keeps compilation consistent across the workspace.
+Set a real `recipient` and preferred `locale` using the plugin settings API before accepting
+submissions. Send JSON containing `email` and `message` to
+`POST /v1/extensions/contact-form/submit`. The spam filter can reject the submission before it
+is persisted. Accepted submissions are private, site-scoped records and trigger text email.
+Operators can inspect an accepted submission with `atlas plugin command contact-form submission.get <id>`.
+
+Zod defines input, output and settings contracts. The Atlas SDK supplies lifecycle and the adapters.
+The testkit checks persistence, rejection and localized notification.

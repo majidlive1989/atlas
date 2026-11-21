@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "slug": "contact-form",
+  "version": "1.0.0",
+  "engines": { "atlas": "*" },
+  "tier": "trusted",
+  "entries": { "server": "dist/index.js" },
+  "permissions": [
+    { "kind": "database", "scope": "own-tables" },
+    { "kind": "hooks", "names": ["contact-form.spam"] },
+    { "kind": "mail" }
+  ],
+  "migrations": "migrations"
+}

@@ -49,6 +49,23 @@ const schema = z
           .map((item) => item.trim())
           .filter(Boolean),
       ),
+    ATLAS_PLUGIN_STORAGE: z.string().min(1).default(".atlas-plugin-storage"),
+    ATLAS_PLUGIN_CACHE_URL: z.url({ protocol: /^rediss?$/ }).optional(),
+    ATLAS_PLUGIN_QUEUE_URL: z.url({ protocol: /^rediss?$/ }).optional(),
+    ATLAS_PLUGIN_SANDBOX_IMAGE: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9._/:@-]+$/)
+      .optional(),
+    ATLAS_PLUGIN_RELEASE_GRANTS: z
+      .string()
+      .default("")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.string().regex(/^[a-f0-9]{64}$/))),
     ATLAS_PLUGIN_ROOT: z.string().min(1).default("plugins"),
     ATLAS_OIDC_ISSUER: z.url({ protocol: /^https$/ }).optional(),
     ATLAS_OIDC_CLIENT_ID: z.string().min(1).optional(),

@@ -17,3 +17,13 @@ interface PluginManifest {
 ```
 
 Tier denotes the requested execution mode. The operator's trust policy determines whether that mode is granted. HTTP origins, storage prefixes and declared hook access are checked on scoped APIs. See [ADR 0003](../adr/0003-plugin-isolation.md).
+
+Phase 2 adds an optional frontend entry, scoped mail, cache and job declarations, and higher-trust
+approval for releases that expand their privileges. Trusted slug approval covers the permissions
+on initial installation. Untrusted activation requires a release-specific digest approval and a
+configured sandbox image. The SDK checks engine ranges and the kernel enforces grants.
+
+Separate archive receipts carry SHA-256 and optional Ed25519 signatures. The static
+[registry schema](plugin-registry.schema.json) describes an index for a future distribution service.
+Runtime validation additionally verifies unique release coordinates and requires signatures and
+signing key IDs to appear together.

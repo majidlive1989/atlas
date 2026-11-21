@@ -3,6 +3,19 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gt, satisfies } from "semver";
 import {
+  supportsAtlas,
+  type PluginDefinition,
+  type PluginManifest,
+  type PluginValue,
+} from "@atlas/plugin-sdk";
+import { z } from "zod";
+import { registerPluginAccess } from "./plugin-access.js";
+import { createRegistrations } from "./plugin-registration.js";
+import { pluginDatabase, valueSchema } from "./plugin-adapters.js";
+import type { PluginResources } from "./plugin-resources.js";
+import { sandboxPlugin } from "./plugin-sandbox.js";
+import { createSandboxDispatch } from "./plugin-sandbox-dispatch.js";
+import {
   activeSites,
   audit,
   recordEvent,
@@ -47,13 +60,20 @@ type Installed = {
   digest: string;
   settingsVersion: number;
 };
-type Subscriptions = { activate(): void; dispose(): Promise<void> };
+type Subscriptions = {
+  activate(): void;
+  dispose(): Promise<void>;
+  persist(tx: DbSession): Promise<void>;
+};
 type PluginEvents = ReturnType<typeof createEventBus<CoreEventCatalog>>;
 
 interface PluginOptions {
   readonly root: string;
   readonly trusted: readonly string[];
   readonly database: Database;
+  readonly grants: readonly string[];
+  readonly sandboxImage?: string | undefined;
+  readonly resources: PluginResources;
   readonly events: PluginEvents;
   readonly fault: (slug: string, action: string) => void;
 }
@@ -81,24 +101,82 @@ function resolveRelease(
   return first;
 }
 
-function checkRelease(release: Release, trusted: readonly string[]): void {
+function checkRelease(release: Release, options: PluginOptions): void {
   const { manifest } = release;
+  const approved = options.grants.includes(release.digest);
   if (
-    !satisfies(atlasVersion, manifest.engines.atlas) ||
-    manifest.tier !== "trusted" ||
-    !trusted.includes(manifest.slug)
-  ) {
-    throw unavailable();
-  }
-  if (
-    manifest.permissions.some(
-      (permission) => permission.kind === "http" || permission.kind === "storage",
-    ) ||
+    !supportsAtlas(manifest, atlasVersion) ||
+    (manifest.tier === "trusted"
+      ? !options.trusted.includes(manifest.slug)
+      : !approved || !options.sandboxImage) ||
     (release.migrations.length > 0 &&
       !manifest.permissions.some((permission) => permission.kind === "database"))
   ) {
     throw unavailable();
   }
+}
+
+async function readModule(release: Release) {
+  const url = pathToFileURL(release.server);
+  url.searchParams.set("release", release.digest);
+  return z
+    .object({
+      plugin: z
+        .custom<PluginDefinition>(
+          (value) =>
+            value !== null &&
+            typeof value === "object" &&
+            "register" in value &&
+            typeof value.register === "function",
+        )
+        .optional(),
+      register: z
+        .custom<PluginModule["register"]>((value) => typeof value === "function")
+        .optional(),
+      boot: z
+        .custom<NonNullable<PluginModule["boot"]>>((value) => typeof value === "function")
+        .optional(),
+    })
+    .parse(await import(url.href));
+}
+
+function settingsValue(value: PluginValue, version: number): PluginValue | undefined {
+  return version === 1 &&
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+    ? undefined
+    : value;
+}
+
+function expandsPermissions(before: PluginManifest, after: PluginManifest): boolean {
+  if (before.tier !== after.tier) return true;
+  const previous = before.permissions;
+  return after.permissions.some((permission) => {
+    switch (permission.kind) {
+      case "hooks":
+        return permission.names.some(
+          (name) => !previous.some((entry) => entry.kind === "hooks" && entry.names.includes(name)),
+        );
+      case "http":
+        return permission.origins.some(
+          (origin) =>
+            !previous.some((entry) => entry.kind === "http" && entry.origins.includes(origin)),
+        );
+      case "storage":
+        return permission.prefixes.some(
+          (prefix) =>
+            !previous.some(
+              (entry) =>
+                entry.kind === "storage" &&
+                entry.prefixes.some((older) => prefix === older || prefix.startsWith(older + "/")),
+            ),
+        );
+      default:
+        return !previous.some((entry) => entry.kind === permission.kind);
+    }
+  });
 }
 
 function checkGraph(releases: ReadonlyMap<string, Release>): string[] {
@@ -131,7 +209,8 @@ async function readInstalled(tx: DbSession, siteId: string): Promise<Installed[]
 }
 
 export function createPluginManager(options: PluginOptions) {
-  const { database, trusted, fault, events } = options;
+  const { database, fault, events } = options;
+  const registrations = createRegistrations(database, options.resources, fault);
   const live = new Map<string, Subscriptions>();
   let tail: Promise<unknown> = Promise.resolve();
   const liveKey = (siteId: string, slug: string) => siteId + ":" + slug;
@@ -153,19 +232,7 @@ export function createPluginManager(options: PluginOptions) {
     installed: Installed,
     release: Release,
   ): Promise<Subscriptions> {
-    checkRelease(release, trusted);
-    const url = pathToFileURL(release.server);
-    url.searchParams.set("release", release.digest);
-    const module: unknown = await import(url.href);
-    if (
-      !module ||
-      typeof module !== "object" ||
-      !("register" in module) ||
-      typeof module.register !== "function" ||
-      ("boot" in module && typeof module.boot !== "function")
-    )
-      throw unavailable();
-    const extension = module as PluginModule;
+    checkRelease(release, options);
     const cleanups: Cleanup[] = [];
     const pending: (() => void)[] = [];
     const owner = liveKey(siteId, installed.slug) + ":" + randomUUID();
@@ -181,7 +248,12 @@ export function createPluginManager(options: PluginOptions) {
         cleanups.push(cleanup);
       },
       onEvent(name, handler) {
-        if (!registering || !allowed.has(name) || typeof handler !== "function")
+        if (
+          !registering ||
+          pending.length >= 128 ||
+          !allowed.has(name) ||
+          typeof handler !== "function"
+        )
           throw unavailable();
         pending.push(() => {
           events.subscribe(
@@ -192,8 +264,33 @@ export function createPluginManager(options: PluginOptions) {
         });
       },
     };
+    const runtime = registrations.prepare({
+      siteId,
+      release,
+      owner,
+      initial: settingsValue(installed.settings, installed.settingsVersion),
+      subscribe: ctx.onEvent,
+      getSettings: async () =>
+        database.scoped(siteId, async (tx) => {
+          const current = (await readInstalled(tx, siteId)).find(
+            (row) => row.slug === installed.slug,
+          );
+          if (!current || current.version !== installed.version) throw unavailable();
+          return settingsValue(current.settings, current.settingsVersion);
+        }),
+      setSettings: async (settings) => {
+        await database.scoped(siteId, async (tx) => {
+          const [updated] = await tx.query(sql`update plugin_activations set
+            settings = ${JSON.stringify(settings)}::jsonb, settings_version = settings_version + 1
+            where site_id = ${siteId} and slug = ${installed.slug} and version = ${installed.version}
+              and state = 'active' returning slug`);
+          if (!updated) throw unavailable();
+        });
+      },
+    });
     async function dispose() {
       events.removeOwner(owner);
+      await runtime.dispose();
       for (const cleanup of cleanups.splice(0).reverse()) {
         try {
           await cleanup();
@@ -203,9 +300,33 @@ export function createPluginManager(options: PluginOptions) {
       }
     }
     try {
-      await extension.register(ctx);
-      await extension.boot?.(ctx);
-      return { activate: () => pending.splice(0).forEach((subscribe) => subscribe()), dispose };
+      if (release.manifest.tier === "untrusted") {
+        if (!options.sandboxImage) throw unavailable();
+        const extension = await sandboxPlugin(
+          options.sandboxImage,
+          release,
+          createSandboxDispatch(runtime.context),
+        );
+        await extension.register(runtime.context);
+      } else {
+        const extension = await readModule(release);
+        if (extension.plugin) {
+          await extension.plugin.register(runtime.context);
+          await extension.plugin.boot?.(runtime.context);
+        } else if (extension.register) {
+          await extension.register(ctx);
+          await extension.boot?.(ctx);
+        } else throw unavailable();
+      }
+      return {
+        activate() {
+          runtime.activate();
+          pending.splice(0).forEach((subscribe) => subscribe());
+        },
+        dispose,
+        persist: (tx) =>
+          registerPluginAccess(tx, siteId, installed.slug, runtime.registryData.values()),
+      };
     } catch (error) {
       await dispose();
       throw error;
@@ -222,7 +343,7 @@ export function createPluginManager(options: PluginOptions) {
     version: string,
   ) {
     const candidate = resolveRelease(releases, slug, version);
-    checkRelease(candidate, trusted);
+    checkRelease(candidate, options);
     for (const site of await activeSites(tx)) {
       if (site.id === context.site.id) continue;
       await scopeSession(tx, site.id);
@@ -268,6 +389,23 @@ export function createPluginManager(options: PluginOptions) {
   }
 
   const manager = {
+    route: (siteId: string, slug: string, method: string, path: string) =>
+      registrations.get(siteId, slug)?.routes.get(method + " " + path),
+    routes: (siteId: string) =>
+      registrations.forSite(siteId).flatMap(([key, registration]) =>
+        [...registration.routes.values()].map((route) => ({
+          slug: key.slice(siteId.length + 1),
+          route,
+        })),
+      ),
+    declarations: (siteId: string, slug: string) => [
+      ...(registrations.get(siteId, slug)?.registryData.values() ?? []),
+    ],
+    async command(siteId: string, slug: string, name: string, args: string[]) {
+      const handler = registrations.get(siteId, slug)?.commands.get(name);
+      if (!handler) throw new AtlasProblem(404, "not-found");
+      return valueSchema.parse(await handler(args));
+    },
     async list(context: AuditContext) {
       const releases = await catalog();
       const installed = await database.scoped(context.site.id, (tx) =>
@@ -280,7 +418,8 @@ export function createPluginManager(options: PluginOptions) {
           state,
           settingsVersion,
         })),
-        available: releases.map(({ manifest }) => ({
+        available: releases.map(({ manifest, digest }) => ({
+          digest,
           slug: manifest.slug,
           version: manifest.version,
           tier: manifest.tier,
@@ -318,12 +457,8 @@ export function createPluginManager(options: PluginOptions) {
               if (
                 current &&
                 prior &&
-                release.manifest.permissions.some(
-                  (next) =>
-                    !prior.manifest.permissions.some(
-                      (before) => JSON.stringify(next) === JSON.stringify(before),
-                    ),
-                )
+                !options.grants.includes(release.digest) &&
+                expandsPermissions(prior.manifest, release.manifest)
               )
                 throw unavailable();
               if (!current && prior && prior.digest !== release.digest) throw unavailable();
@@ -344,13 +479,24 @@ export function createPluginManager(options: PluginOptions) {
                 digest: release.digest,
                 settingsVersion: current?.settingsVersion ?? 1,
               };
+              if (operation === "upgrade" && current && release.manifest.tier === "trusted") {
+                const { plugin } = await readModule(release);
+                await plugin?.onUpgrade?.(current.version, version, {
+                  db: pluginDatabase(release, context.site.id, (work) => work(tx)),
+                  readSettings: () => structuredClone(next.settings),
+                  async writeSettings(value) {
+                    next.settings = valueSchema.parse(value);
+                    next.settingsVersion += 1;
+                  },
+                });
+              }
               if (next.state === "active") {
                 allDependenciesLive(release, context.site.id);
                 staged.subscription = await stage(context.site.id, next, release);
               }
-              await tx.query(sql`insert into plugin_activations (site_id, slug, version, state)
-                values (${context.site.id}, ${slug}, ${version}, ${next.state})
-                on conflict (site_id, slug) do update set version = excluded.version, state = excluded.state`);
+              await tx.query(sql`insert into plugin_activations (site_id, slug, version, state, settings, settings_version)
+                values (${context.site.id}, ${slug}, ${version}, ${next.state}, ${JSON.stringify(next.settings)}::jsonb, ${next.settingsVersion})
+                on conflict (site_id, slug) do update set version = excluded.version, state = excluded.state, settings = excluded.settings, settings_version = excluded.settings_version`);
             } else {
               if (!current) throw new AtlasProblem(404, "not-found");
               if (operation === "activate") {
@@ -379,6 +525,7 @@ export function createPluginManager(options: PluginOptions) {
               }
             }
             if (staged.subscription) {
+              await staged.subscription.persist(tx);
               const payload = { slug, version: version ?? current?.version ?? "" };
               staged.fact = await recordEvent(tx, context, "extension.pluginActivated", payload);
             }
@@ -418,7 +565,14 @@ export function createPluginManager(options: PluginOptions) {
           select settings, settings_version as version from plugin_activations
           where site_id = ${context.site.id} and slug = ${slug}`);
         if (!entry) throw new AtlasProblem(404, "not-found");
-        return entry;
+        const schema = registrations.get(context.site.id, slug)?.settings;
+        return schema
+          ? {
+              ...entry,
+              settings: schema.read(settingsValue(entry.settings, entry.version)),
+              uiSchema: schema.uiSchema,
+            }
+          : entry;
       });
     },
 
@@ -426,6 +580,8 @@ export function createPluginManager(options: PluginOptions) {
       return serial(() =>
         database.scoped(context.site.id, async (tx) => {
           await databaseLock(tx);
+          const schema = registrations.get(context.site.id, slug)?.settings;
+          if (schema) settings = schema.parse(settings);
           const [entry] = await tx.query<{ version: number }>(sql`update plugin_activations
           set settings = ${JSON.stringify(settings)}::jsonb, settings_version = settings_version + 1
           where site_id = ${context.site.id} and slug = ${slug} and settings_version = ${version}
@@ -458,6 +614,12 @@ export function createPluginManager(options: PluginOptions) {
                 await restoreOne(dependency, visiting);
               }
               const subscription = await stage(site.id, row, release);
+              try {
+                await database.scoped(site.id, (tx) => subscription.persist(tx));
+              } catch (error) {
+                await subscription.dispose();
+                throw error;
+              }
               subscription.activate();
               live.set(id, subscription);
             } finally {

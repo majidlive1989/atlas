@@ -8,6 +8,7 @@ export type Release = {
   readonly manifest: PluginManifest;
   readonly digest: string;
   readonly server: string;
+  readonly root: string;
   readonly migrations: Awaited<ReturnType<typeof readMigrations>>;
 };
 
@@ -62,7 +63,7 @@ async function hashTree(
 ): Promise<void> {
   const entries = await readdir(folder, { withFileTypes: true });
   for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : a.name === b.name ? 0 : 1))) {
-    if (entry.name === "node_modules" || entry.name === ".git") continue;
+    if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".turbo") continue;
     const path = join(folder, entry.name);
     if (entry.isSymbolicLink()) throw new Error("Plugin releases cannot contain symlinks.");
     if (entry.isDirectory()) {
@@ -89,12 +90,13 @@ export async function readRelease(path: string): Promise<Release> {
   const server = await contained(root, manifest.entries.server);
   if (!(await stat(server)).isFile()) throw new Error("Invalid server entry.");
   if (manifest.entries.admin) await contained(root, manifest.entries.admin);
+  if (manifest.entries.frontend) await contained(root, manifest.entries.frontend);
   const hash = createHash("sha256");
   await hashTree(root, root, hash, { files: 0, bytes: 0 });
   const migrations = manifest.migrations
     ? await readMigrations(await contained(root, manifest.migrations))
     : [];
-  return { manifest, digest: hash.digest("hex"), server, migrations };
+  return { manifest, digest: hash.digest("hex"), server, migrations, root };
 }
 
 export async function discoverPlugins(

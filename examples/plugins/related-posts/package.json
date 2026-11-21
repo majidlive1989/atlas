@@ -17,6 +17,11 @@
     "test": "vitest run --config ../../../vitest.config.ts"
   },
   "devDependencies": {
-    "@atlas/tsconfig": "workspace:*"
+    "@atlas/tsconfig": "workspace:*",
+    "@atlas/plugin-testkit": "workspace:*"
+  },
+  "dependencies": {
+    "@atlas/plugin-sdk": "workspace:*",
+    "zod": "^4.3.6"
   }
 }

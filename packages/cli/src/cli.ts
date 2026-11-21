@@ -1,11 +1,8 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { startApi } from "@atlas/api";
-import { emailSchema, hashPassword, passwordSchema } from "@atlas/auth";
 import { readConfig } from "@atlas/config";
-import { checkMigrations, migrate, openDatabase, resolveSite, seed } from "@atlas/db";
-import { createKernel } from "@atlas/kernel";
 import { z } from "zod";
+import { packPlugin, verifyPlugin } from "./plugin-package.js";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 const portOrigin = z.url({ protocol: /^https?$/ });
@@ -17,6 +14,9 @@ const slug = z
 const help = `atlas dev | build | start | doctor
 atlas db migrate | rollback | seed
 atlas user create <email> <display-name>
+atlas plugin pack <release-directory> <archive.zip|archive.tgz> [--sign <private-key>]
+atlas plugin verify <archive> [--key <public-key>]
+atlas plugin command <slug> <command> [arguments...]
 atlas plugin list
 atlas plugin install | upgrade <slug> <version>
 atlas plugin activate | deactivate | uninstall <slug>`;
@@ -40,7 +40,7 @@ async function useApi(
   env: Environment,
   path: string,
   method = "GET",
-  body?: Record<string, string>,
+  body?: Record<string, string | readonly string[]>,
 ) {
   const base = portOrigin.parse(env.ATLAS_API_URL ?? "http://localhost:3000");
   const token = z.string().min(32).max(4096).parse(env.ATLAS_OPERATOR_TOKEN);
@@ -76,6 +76,7 @@ export async function runCli(args: readonly string[], env: Environment): Promise
       const built = await pnpm(["exec", "turbo", "run", "build", "--filter=@atlas/api"]);
       return built === 0 ? pnpm(["exec", "node", "--watch", "apps/api/dist/main.js"]) : built;
     }
+    const { startApi } = await import("@atlas/api");
     const server = await startApi(env);
     print({ address: server.address });
     await new Promise<void>((resolve, reject) => {
@@ -92,6 +93,7 @@ export async function runCli(args: readonly string[], env: Environment): Promise
   }
 
   if (args.length === 1 && group === "doctor") {
+    const { checkMigrations, openDatabase, resolveSite } = await import("@atlas/db");
     const config = readConfig(env);
     const database = openDatabase(config.DATABASE_URL);
     try {
@@ -112,10 +114,12 @@ export async function runCli(args: readonly string[], env: Environment): Promise
     args.length === 2 &&
     (action === "migrate" || action === "rollback" || action === "seed")
   ) {
+    const { migrate, openDatabase, seed } = await import("@atlas/db");
     const url = z.url({ protocol: /^postgres(?:ql)?$/ }).parse(env.DATABASE_URL);
     const database = openDatabase(url);
     try {
       if (action === "seed") {
+        const { emailSchema, hashPassword, passwordSchema } = await import("@atlas/auth");
         const email = emailSchema.parse(env.ATLAS_SEED_EMAIL);
         const passwordHash = await hashPassword(passwordSchema.parse(env.ATLAS_SEED_PASSWORD));
         print(
@@ -135,6 +139,7 @@ export async function runCli(args: readonly string[], env: Environment): Promise
   }
 
   if (group === "user" && action === "create" && args.length === 4) {
+    const { emailSchema, passwordSchema } = await import("@atlas/auth");
     const email = emailSchema.parse(subject);
     const displayName = z.string().trim().min(1).max(100).parse(rest);
     const password = passwordSchema.parse(env.ATLAS_USER_PASSWORD);
@@ -142,6 +147,10 @@ export async function runCli(args: readonly string[], env: Environment): Promise
       await useApi(env, "/v1/users", "POST", { email, displayName, password });
     } else {
       const config = readConfig(env);
+      const [{ createKernel }, { resolveSite }] = await Promise.all([
+        import("@atlas/kernel"),
+        import("@atlas/db"),
+      ]);
       const kernel = createKernel(config);
       try {
         const site = await resolveSite(kernel.services.database, config.ATLAS_SITE_HOST);
@@ -162,6 +171,33 @@ export async function runCli(args: readonly string[], env: Environment): Promise
   }
 
   if (group === "plugin" && action) {
+    if (
+      action === "pack" &&
+      subject &&
+      rest &&
+      (args.length === 4 || (args.length === 6 && args[4] === "--sign"))
+    ) {
+      print(await packPlugin(subject, rest, args[5]));
+      return 0;
+    }
+    if (
+      action === "verify" &&
+      subject &&
+      (args.length === 3 || (args.length === 5 && rest === "--key"))
+    ) {
+      print(await verifyPlugin(subject, args[4]));
+      return 0;
+    }
+    if (action === "command" && subject && rest) {
+      const command = z
+        .string()
+        .regex(/^[a-z][a-z0-9._-]{0,99}$/)
+        .parse(rest);
+      await useApi(env, "/v1/plugins/" + slug.parse(subject) + "/commands/" + command, "POST", {
+        args: args.slice(4),
+      });
+      return 0;
+    }
     if (action === "list" && args.length === 2) {
       await useApi(env, "/v1/plugins");
       return 0;

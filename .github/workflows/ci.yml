@@ -25,6 +25,11 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm --filter @atlas/plugin-sdk test:api
+      - run: pnpm --filter @atlas/plugin-sdk hooks:reference --check
+      - run: pnpm --filter @atlas/plugin-sdk registry:schema --check
+      - run: docker pull node:22-bookworm-slim
+      - run: docker pull redis:7.4-alpine
       - run: pnpm test:e2e
       - run: pnpm test:integration
 

@@ -1,5 +1,6 @@
 import { emailSchema, passwordSchema } from "@atlas/auth";
 import { pluginSlug, releaseVersion } from "@atlas/contracts";
+import { audit } from "@atlas/db";
 import { AtlasProblem, settingKey, type Kernel } from "@atlas/kernel";
 import { z } from "zod";
 import {
@@ -23,10 +24,17 @@ const roleKey = z
   .min(1)
   .max(48)
   .regex(/^[a-z][a-z0-9_-]*$/);
+const roleIdentity = z.union([
+  roleKey,
+  z
+    .string()
+    .max(105)
+    .regex(/^plugin\.[a-z0-9-]+\.[a-z0-9-]+$/),
+]);
 const user = z.strictObject({ id, displayName: z.string(), email: z.email(), locale: z.string() });
 const role = z.strictObject({
   id,
-  key: roleKey,
+  key: roleIdentity,
   label: z.string(),
   reserved: z.boolean(),
   capabilities: z.array(z.string()),
@@ -46,10 +54,12 @@ const available = z.strictObject({
   slug: pluginSlug,
   version: releaseVersion,
   tier: z.enum(["trusted", "untrusted"]),
+  digest: z.string().regex(/^[a-f0-9]{64}$/),
 });
 const pluginParams = z.strictObject({ slug: pluginSlug });
 const pluginSettings = z.strictObject({
   settings: jsonSettings,
+  uiSchema: z.record(z.string(), jsonValue).optional(),
   version: z.number().int().positive(),
 });
 
@@ -141,7 +151,10 @@ export function registerManagement(app: AtlasApi, kernel: Kernel, security: Requ
         },
       },
     },
-    async () => access.capabilities(),
+    async (request) => [
+      ...access.capabilities(),
+      ...(await access.pluginCapabilities((await security.scope(request)).site.id)),
+    ],
   );
 
   app.put(
@@ -172,7 +185,7 @@ export function registerManagement(app: AtlasApi, kernel: Kernel, security: Requ
       preHandler: security.require("identity.role.manage"),
       schema: {
         security: securitySchema,
-        params: z.strictObject({ id, key: roleKey }),
+        params: z.strictObject({ id, key: roleIdentity }),
         body: z.strictObject({ assigned: z.boolean() }),
         response: { 204: z.null(), ...commonProblems },
       },
@@ -276,7 +289,58 @@ export function registerManagement(app: AtlasApi, kernel: Kernel, security: Requ
     async (request, reply) => {
       const result = await plugins.readSettings(await security.scope(request), request.params.slug);
       reply.header("etag", '"' + result.version + '"');
-      return { settings: jsonSettings.parse(result.settings), version: result.version };
+      return pluginSettings.parse(result);
+    },
+  );
+
+  app.get(
+    "/v1/plugins/:slug/declarations",
+    {
+      preHandler: security.require("extension.plugin.manage"),
+      schema: {
+        security: securitySchema,
+        params: pluginParams,
+        response: { 200: z.array(jsonValue), ...commonProblems },
+      },
+    },
+    async (request) => {
+      const scope = await security.scope(request);
+      return z.array(jsonValue).parse(plugins.declarations(scope.site.id, request.params.slug));
+    },
+  );
+
+  app.post(
+    "/v1/plugins/:slug/commands/:command",
+    {
+      preHandler: security.require("extension.plugin.manage"),
+      schema: {
+        security: securitySchema,
+        params: pluginParams.extend({
+          command: z
+            .string()
+            .max(100)
+            .regex(/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/),
+        }),
+        body: z.strictObject({ args: z.array(z.string().max(1024)).max(32) }),
+        response: { 200: z.strictObject({ result: jsonValue }), ...commonProblems },
+      },
+    },
+    async (request) => {
+      const scope = await security.scope(request);
+      await kernel.services.database.scoped(scope.site.id, (tx) =>
+        audit(tx, scope, "extension.plugin.command", {
+          slug: request.params.slug,
+          command: request.params.command,
+        }),
+      );
+      return {
+        result: await plugins.command(
+          scope.site.id,
+          request.params.slug,
+          request.params.command,
+          request.body.args,
+        ),
+      };
     },
   );
 

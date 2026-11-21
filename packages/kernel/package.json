@@ -18,17 +18,23 @@
   },
   "devDependencies": {
     "@atlas/tsconfig": "workspace:*",
+    "@types/nodemailer": "^7.0.12",
     "@types/semver": "^7.7.1"
   },
   "dependencies": {
-    "@atlas/config": "workspace:*",
-    "@atlas/db": "workspace:*",
     "@atlas/auth": "workspace:*",
-    "@atlas/hooks": "workspace:*",
+    "@atlas/config": "workspace:*",
     "@atlas/contracts": "workspace:*",
-    "pino": "^9.13.1",
+    "@atlas/db": "workspace:*",
+    "@atlas/hooks": "workspace:*",
+    "@atlas/plugin-sdk": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
-    "zod": "^4.1.12",
-    "semver": "^7.7.2"
+    "bullmq": "^6.7.8",
+    "cron-parser": "^5.10.6",
+    "ioredis": "^6.0.0",
+    "nodemailer": "^7.0.13",
+    "pino": "^9.13.1",
+    "semver": "^7.7.2",
+    "zod": "^4.1.12"
   }
 }

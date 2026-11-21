@@ -12,3 +12,5 @@ test-results/
 
 .phase0-runtime/
 .pnpm-store/
+
+.atlas-plugin-storage/
