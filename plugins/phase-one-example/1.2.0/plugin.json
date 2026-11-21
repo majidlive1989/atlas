@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "slug": "phase-one-example",
+  "version": "1.2.0",
+  "engines": {
+    "atlas": ">=0.0.0 <1.0.0"
+  },
+  "tier": "trusted",
+  "entries": {
+    "server": "index.mjs"
+  },
+  "permissions": [
+    {
+      "kind": "database",
+      "scope": "own-tables"
+    },
+    {
+      "kind": "hooks",
+      "names": ["extension.pluginActivated"]
+    }
+  ],
+  "migrations": "migrations"
+}

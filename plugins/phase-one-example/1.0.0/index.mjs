@@ -1,0 +1,7 @@
+export function register(context) {
+  const active = new Map();
+  context.onEvent("extension.pluginActivated", ({ payload }) =>
+    active.set(payload.slug, payload.version),
+  );
+  context.onDispose(() => active.clear());
+}

@@ -1,2 +1,6 @@
-// Named public exports are introduced when the workspace takes on runtime responsibilities.
-export {};
+export { sql } from "drizzle-orm";
+export * as schema from "./schema.js";
+export type { JsonValue } from "./schema.js";
+export * from "./database.js";
+export * from "./migrate.js";
+export * from "./seed.js";

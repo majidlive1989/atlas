@@ -1,7 +1,5 @@
 # @atlas/config
 
-Runtime configuration and validation.
+Zod validates runtime environment types before resources open. This workspace owns the configuration contract.
 
-The public surface is `src/index.ts`. Build with `pnpm build` and run its smoke test with
-`pnpm test` from this directory. Runtime dependencies are introduced with the phase that uses them.
-The shared TypeScript configuration keeps compilation consistent across the workspace.
+The named entry point is `src/index.ts`. Run `pnpm build` and `pnpm test` in this workspace or from the repository root.

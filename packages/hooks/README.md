@@ -1,7 +1,5 @@
 # @atlas/hooks
 
-Typed hooks and domain events.
+The hook engine executes typed ordered callbacks and supports advisory or fail-closed dispatch. The event bus uses a typed catalog. Run the performance and negative type examples with the workspace test and typecheck commands.
 
-The public surface is `src/index.ts`. Build with `pnpm build` and run its smoke test with
-`pnpm test` from this directory. Runtime dependencies are introduced with the phase that uses them.
-The shared TypeScript configuration keeps compilation consistent across the workspace.
+The named entry point is `src/index.ts`. Run `pnpm build` and `pnpm test` in this workspace or from the repository root.

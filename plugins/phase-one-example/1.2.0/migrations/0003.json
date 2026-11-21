@@ -1,0 +1,18 @@
+[
+  {
+    "action": "add-column",
+    "table": "inventory",
+    "column": {
+      "name": "transient",
+      "type": "text"
+    }
+  },
+  {
+    "action": "add-column",
+    "table": "inventory",
+    "column": {
+      "name": "label",
+      "type": "text"
+    }
+  }
+]

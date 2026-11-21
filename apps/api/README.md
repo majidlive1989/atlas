@@ -1,7 +1,10 @@
 # @atlas/api
 
-Fastify API composition root.
+Fastify serves versioned management APIs, runtime health and OpenAPI 3.1. Zod and
+`fastify-type-provider-zod` share request validation, response serialization and schema transformation.
+The official Fastify cookie, CORS, Helmet, rate-limit, Swagger and Swagger UI plugins provide HTTP
+boundary controls and interactive documentation. PostgreSQL Testcontainers supply real database
+fixtures, and Swagger Parser validates the generated contract.
 
-The public surface is `src/index.ts`. Build with `pnpm build` and run its smoke test with
-`pnpm test` from this directory. Runtime dependencies are introduced with the phase that uses them.
-The shared TypeScript configuration keeps compilation consistent across the workspace.
+The public entry point is `src/index.ts`. See the [Phase 1 runbook](../../docs/reports/phase-1.md)
+for startup and integration tests.

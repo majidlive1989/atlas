@@ -1,2 +1,1 @@
-// Named public exports are introduced when the workspace takes on runtime responsibilities.
-export {};
+export { createApi, startApi, type AtlasApi } from "./server.js";

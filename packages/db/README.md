@@ -1,7 +1,5 @@
 # @atlas/db
 
-PostgreSQL and migrations.
+Drizzle represents the schema and generates parameterized queries. `pg` supplies pooled PostgreSQL connections. The package exports scoped transactions, audit/outbox helpers, reversible core migrations and idempotent seed provisioning.
 
-The public surface is `src/index.ts`. Build with `pnpm build` and run its smoke test with
-`pnpm test` from this directory. Runtime dependencies are introduced with the phase that uses them.
-The shared TypeScript configuration keeps compilation consistent across the workspace.
+The named entry point is `src/index.ts`. Run `pnpm build` and `pnpm test` in this workspace or from the repository root.

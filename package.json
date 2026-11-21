@@ -12,14 +12,16 @@
     "lint": "node scripts/check-workspaces.mjs && eslint . && prettier --check . && turbo run lint",
     "typecheck": "tsc -p tsconfig.json && turbo run typecheck",
     "test": "vitest run && turbo run test",
-    "test:integration": "node scripts/check-services.mjs",
+    "test:integration": "pnpm --filter @atlas/api test:integration",
     "test:e2e": "playwright test",
     "services:up": "docker compose up --wait --wait-timeout 120",
     "services:down": "docker compose down",
     "format": "prettier --write .",
     "dev": "turbo run dev --filter=\"./apps/*\"",
     "changeset": "changeset",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:services": "node scripts/check-services.mjs",
+    "atlas": "node packages/cli/dist/main.js"
   },
   "devDependencies": {
     "@atlas/eslint-config": "workspace:*",

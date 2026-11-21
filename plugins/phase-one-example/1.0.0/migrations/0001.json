@@ -1,0 +1,12 @@
+[
+  {
+    "action": "create-table",
+    "table": "inventory",
+    "columns": [
+      {
+        "name": "amount",
+        "type": "integer"
+      }
+    ]
+  }
+]

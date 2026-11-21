@@ -18,5 +18,8 @@
   },
   "devDependencies": {
     "@atlas/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
   }
 }

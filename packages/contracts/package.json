@@ -17,6 +17,11 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "devDependencies": {
-    "@atlas/tsconfig": "workspace:*"
+    "@atlas/tsconfig": "workspace:*",
+    "@types/semver": "^7.7.1"
+  },
+  "dependencies": {
+    "zod": "^4.1.12",
+    "semver": "^7.7.2"
   }
 }

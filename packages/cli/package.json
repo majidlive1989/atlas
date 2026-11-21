@@ -18,5 +18,16 @@
   },
   "devDependencies": {
     "@atlas/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "@atlas/api": "workspace:*",
+    "@atlas/kernel": "workspace:*",
+    "@atlas/config": "workspace:*",
+    "@atlas/db": "workspace:*",
+    "@atlas/auth": "workspace:*",
+    "zod": "^4.1.12"
+  },
+  "bin": {
+    "atlas": "./dist/main.js"
   }
 }

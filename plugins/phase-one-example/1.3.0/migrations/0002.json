@@ -1,0 +1,10 @@
+[
+  {
+    "action": "add-column",
+    "table": "inventory",
+    "column": {
+      "name": "label",
+      "type": "text"
+    }
+  }
+]

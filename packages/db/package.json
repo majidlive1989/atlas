@@ -17,6 +17,11 @@
     "test": "vitest run --config ../../vitest.config.ts"
   },
   "devDependencies": {
-    "@atlas/tsconfig": "workspace:*"
+    "@atlas/tsconfig": "workspace:*",
+    "@types/pg": "^8.15.5"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.7",
+    "pg": "^8.16.3"
   }
 }
