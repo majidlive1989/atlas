@@ -12,6 +12,7 @@ import type {
   PluginValue,
 } from "@atlas/plugin-sdk";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import { Wait } from "testcontainers";
 import { z } from "zod";
 
 export interface PluginHarnessOptions {
@@ -310,7 +311,11 @@ export function createPluginHarness(options: PluginHarnessOptions = {}) {
 export async function startPluginPostgres(
   image = process.env.ATLAS_TEST_POSTGRES_IMAGE ?? "postgres:17-alpine",
 ) {
-  const container = await new PostgreSqlContainer(image).withPassword(randomUUID()).start();
+  const container = await new PostgreSqlContainer(image)
+    .withPassword(randomUUID())
+    // The first PostgreSQL listener only serves the initialization process over a socket.
+    .withWaitStrategy(Wait.forLogMessage(/\[1\].*database system is ready to accept connections/))
+    .start();
   const database = openDatabase(container.getConnectionUri());
   async function close() {
     try {

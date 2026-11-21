@@ -8,12 +8,12 @@ import { GenericContainer, Wait } from "testcontainers";
 import { promisify } from "node:util";
 import { hashPassword } from "@atlas/auth";
 import { readConfig } from "@atlas/config";
-import { migrate, openDatabase, seed, sql } from "@atlas/db";
+import { seed, sql } from "@atlas/db";
+import { startPluginPostgres } from "@atlas/plugin-testkit";
 import { createKernel } from "@atlas/kernel";
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { expect, it } from "vitest";
 import { createApi } from "../src/index.js";
-import { startPostgres } from "../test/postgres.js";
 
 const run = promisify(execFile);
 const repository = fileURLToPath(new URL("../../../", import.meta.url));
@@ -36,9 +36,9 @@ function environment(databaseUrl: string, pluginRoot: string) {
 }
 
 async function open(pluginRoot: string, extra: Record<string, string> = {}) {
-  const pg = await startPostgres("atlas-plugin-integration");
-  const database = openDatabase(pg.getConnectionUri());
-  const env = { ...environment(pg.getConnectionUri(), pluginRoot), ...extra };
+  const postgres = await startPluginPostgres();
+  const { database } = postgres;
+  const env = { ...environment(postgres.url, pluginRoot), ...extra };
   const mail: { to: string; subject: string; text: string }[] = [];
   const kernel = createKernel(readConfig(env), {
     database,
@@ -51,15 +51,10 @@ async function open(pluginRoot: string, extra: Record<string, string> = {}) {
     try {
       await app.close();
     } finally {
-      try {
-        await database.close();
-      } finally {
-        await pg.stop();
-      }
+      await postgres.close();
     }
   }
   try {
-    await migrate(database, "up");
     await seed(database, {
       email,
       passwordHash: await hashPassword(password),
